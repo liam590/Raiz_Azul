@@ -1,0 +1,183 @@
+{
+    "fincas": [
+        {
+            "id": 1,
+            "nombre": "La Esperanza",
+            "zona": "Matagalpa"
+        },
+        {
+            "id": 2,
+            "nombre": "El Mirador",
+            "zona": "Jinotega"
+        }
+    ],
+    "parcelas": [
+        {
+            "id": 1,
+            "idFinca": 1,
+            "nombre": "Lote Alto",
+            "finca": "La Esperanza",
+            "zona": "Matagalpa",
+            "cultivo": "Tomate",
+            "area": 1.5,
+            "siembra": "2026-08-26",
+            "cosechada": false
+        },
+        {
+            "id": 2,
+            "idFinca": 1,
+            "nombre": "Vega del Río",
+            "finca": "La Esperanza",
+            "zona": "Matagalpa",
+            "cultivo": "Frijol",
+            "area": 2,
+            "siembra": "2026-09-09",
+            "cosechada": false
+        },
+        {
+            "id": 3,
+            "idFinca": 2,
+            "nombre": "Terraza Norte",
+            "finca": "El Mirador",
+            "zona": "Jinotega",
+            "cultivo": "Maíz",
+            "area": 3,
+            "siembra": "2026-07-13",
+            "cosechada": false
+        },
+        {
+            "id": 4,
+            "idFinca": 2,
+            "nombre": "Ladera Sur",
+            "finca": "El Mirador",
+            "zona": "Jinotega",
+            "cultivo": "Repollo",
+            "area": 1,
+            "siembra": "2026-07-25",
+            "cosechada": false
+        },
+        {
+            "id": 5,
+            "idFinca": 1,
+            "nombre": "Dulce encanto",
+            "finca": "La Esperanza",
+            "zona": "Matagalpa",
+            "cultivo": "Tomate",
+            "area": 1.5,
+            "siembra": "2026-10-22",
+            "cosechada": false
+        },
+        {
+            "id": 6,
+            "idFinca": 1,
+            "nombre": "Catarina Hills",
+            "finca": "La Esperanza",
+            "zona": "Matagalpa",
+            "cultivo": "Tomate",
+            "area": 1.5,
+            "siembra": "2026-10-22",
+            "cosechada": false
+        }
+    ],
+    "registros": [
+        {
+            "id": 1,
+            "parcelaId": "finca:La Esperanza",
+            "idFinca": 1,
+            "tipo": "lluvia",
+            "fecha": "2026-10-15",
+            "valor": 24,
+            "detalle": "",
+            "nota": "",
+            "autor": "Liam"
+        },
+        {
+            "id": 2,
+            "parcelaId": "finca:La Esperanza",
+            "idFinca": 1,
+            "tipo": "lluvia",
+            "fecha": "2026-10-08",
+            "valor": 8,
+            "detalle": "",
+            "nota": "",
+            "autor": "Cristin"
+        },
+        {
+            "id": 3,
+            "parcelaId": "finca:El Mirador",
+            "idFinca": 2,
+            "tipo": "lluvia",
+            "fecha": "2026-10-16",
+            "valor": 5,
+            "detalle": "",
+            "nota": "",
+            "autor": "Iris"
+        },
+        {
+            "id": 4,
+            "parcelaId": 1,
+            "idFinca": 1,
+            "tipo": "riego",
+            "fecha": "2026-10-13",
+            "valor": 6700,
+            "detalle": "",
+            "nota": "Riego por goteo",
+            "autor": "Liam"
+        },
+        {
+            "id": 5,
+            "parcelaId": 2,
+            "idFinca": 1,
+            "tipo": "riego",
+            "fecha": "2026-10-14",
+            "valor": 8000,
+            "detalle": "",
+            "nota": "Riego matutino",
+            "autor": "Cristin"
+        },
+        {
+            "id": 6,
+            "parcelaId": 3,
+            "idFinca": 2,
+            "tipo": "riego",
+            "fecha": "2026-10-13",
+            "valor": 18000,
+            "detalle": "",
+            "nota": "",
+            "autor": "Iris"
+        },
+        {
+            "id": 7,
+            "parcelaId": 1,
+            "idFinca": 1,
+            "tipo": "insumo",
+            "fecha": "2026-09-30",
+            "valor": 90,
+            "detalle": "Fórmula 12-30-10",
+            "nota": "1.ª fertilización",
+            "autor": "Cristin"
+        },
+        {
+            "id": 8,
+            "parcelaId": 1,
+            "idFinca": 1,
+            "tipo": "labor",
+            "fecha": "2026-10-05",
+            "valor": 0,
+            "detalle": "Deshierbe",
+            "nota": "",
+            "autor": "Iris"
+        },
+        {
+            "id": 9,
+            "parcelaId": 5,
+            "idFinca": 1,
+            "tipo": "lluvia",
+            "fecha": "2026-10-22",
+            "valor": 22.2,
+            "detalle": "",
+            "nota": "Cayó mucha lluvia vo",
+            "autor": "Liam"
+        }
+    ]
+}
