@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../core/theme.dart';
-import '../core/api_service.dart';
+import '../core/offline_api_service.dart';
 import '../models/parcela.dart';
 import '../models/registro.dart';
 
@@ -22,7 +22,7 @@ class DetalleParcelaModal extends StatefulWidget {
 }
 
 class _DetalleParcelaModalState extends State<DetalleParcelaModal> {
-  final ApiService _api = ApiService();
+  final OfflineApiService _api = OfflineApiService();
   bool _cargando = true;
   List<Registro> _registros = [];
   bool _confirmandoEliminar = false;

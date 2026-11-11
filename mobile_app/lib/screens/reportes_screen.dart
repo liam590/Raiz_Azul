@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../core/theme.dart';
-import '../core/api_service.dart';
+import '../core/offline_api_service.dart';
+import '../core/export_service.dart';
+import '../models/registro.dart';
 
 class ReportesScreen extends StatefulWidget {
   const ReportesScreen({super.key});
@@ -11,9 +13,12 @@ class ReportesScreen extends StatefulWidget {
 }
 
 class _ReportesScreenState extends State<ReportesScreen> {
-  final ApiService _api = ApiService();
+  final OfflineApiService _api = OfflineApiService();
+  final ExportService _export = ExportService();
   bool _cargando = true;
+  bool _exportando = false;
   Map<String, dynamic> _reporte = {};
+  List<Registro> _registros = [];
 
   @override
   void initState() {
@@ -22,26 +27,91 @@ class _ReportesScreenState extends State<ReportesScreen> {
   }
 
   Future<void> _cargarReportes() async {
+    if (!mounted) return;
     setState(() => _cargando = true);
-    final data = await _api.fetchReportes();
-    if (mounted) {
-      setState(() {
-        _reporte = data;
-        _cargando = false;
-      });
+    try {
+      final data = await _api.fetchReportes().timeout(const Duration(seconds: 10));
+      await _api.fetchParcelas().timeout(const Duration(seconds: 10)); // Ensure catalogs are cached locally
+      final registros = await _api.fetchRegistros().timeout(const Duration(seconds: 10));
+      if (mounted) {
+        setState(() {
+          _reporte = data is Map<String, dynamic> ? data : {};
+          _registros = registros;
+          _cargando = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _reporte = {};
+          _registros = [];
+          _cargando = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _exportarPdf() async {
+    setState(() => _exportando = true);
+    try {
+      final parcelasData = _reporte['parcelas'] as List? ?? [];
+      await _export.exportReportToPdf(
+        reporte: _reporte,
+        parcelasData: parcelasData,
+        registros: _registros,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF exportado correctamente'), backgroundColor: AppColors.brote),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error exportando PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportando = false);
+    }
+  }
+
+  Future<void> _exportarExcel() async {
+    setState(() => _exportando = true);
+    try {
+      final parcelasData = _reporte['parcelas'] as List? ?? [];
+      await _export.exportReportToExcel(
+        reporte: _reporte,
+        parcelasData: parcelasData,
+        registros: _registros,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Excel exportado correctamente'), backgroundColor: AppColors.brote),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error exportando Excel: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportando = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.azul));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppColors.azul)));
     }
 
-    final double totalAgua = (_reporte['totalAguaRiego'] ?? 0.0).toDouble();
-    final double lluviaPromedio = (_reporte['lluviaPromedioMm'] ?? 0.0).toDouble();
-    final double ahorroL = (_reporte['ahorroPotencialLitros'] ?? 0.0).toDouble();
-    final List parcelas = _reporte['parcelas'] as List? ?? [];
+    final Map<String, dynamic> reporte = _reporte is Map<String, dynamic> ? _reporte : {};
+    final double totalAgua = (reporte['totalAguaRiego'] ?? 0.0).toDouble();
+    final double lluviaPromedio = (reporte['lluviaPromedioMm'] ?? 0.0).toDouble();
+    final double ahorroL = (reporte['ahorroPotencialLitros'] ?? 0.0).toDouble();
+    final List parcelas = reporte['parcelas'] is List ? reporte['parcelas'] as List : [];
 
     double maxPorMz = 1.0;
     for (var p in parcelas) {
@@ -53,14 +123,33 @@ class _ReportesScreenState extends State<ReportesScreen> {
     final fmtDec = NumberFormat('#,##0.0', 'es');
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Reportes'),
+        actions: [
+          IconButton(
+            tooltip: 'Exportar PDF',
+            onPressed: _exportando ? null : _exportarPdf,
+            icon: _exportando
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.picture_as_pdf_rounded),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Exportar Excel',
+            onPressed: _exportando ? null : _exportarExcel,
+            icon: _exportando
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.table_chart_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: RefreshIndicator(
         color: AppColors.azul,
         onRefresh: _cargarReportes,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
           children: [
-            const Text('Reportes', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.ink)),
-            const SizedBox(height: 2),
             const Text('Uso de recursos desde la siembra hasta hoy, por parcela y ciclo.', style: TextStyle(color: AppColors.muted, fontSize: 13.5)),
             const SizedBox(height: 16),
 

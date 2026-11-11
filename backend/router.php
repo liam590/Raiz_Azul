@@ -17,11 +17,23 @@ $routes = [
     '/api/registros' => '/api/registros.php',
     '/api/calendario' => '/api/calendario.php',
     '/api/reportes' => '/api/reportes.php',
-    '/api/catalogos' => '/api/catalogos.php'
+    '/api/catalogos' => '/api/catalogos.php',
+    // Auth
+    '/api/auth/login' => '/api/auth/login.php',
+    '/api/auth/me' => '/api/auth/me.php',
+    '/api/auth/refresh' => '/api/auth/refresh.php',
+    '/api/auth/logout' => '/api/auth/logout.php'
 ];
 
 if (isset($routes[$uri])) {
     require __DIR__ . $routes[$uri];
+    exit;
+}
+
+// Intentar cargar en api/auth/
+$authFile = __DIR__ . '/api/auth/' . basename($uri) . '.php';
+if (file_exists($authFile)) {
+    require $authFile;
     exit;
 }
 

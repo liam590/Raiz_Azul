@@ -77,6 +77,17 @@
             "area": 1.5,
             "siembra": "2026-10-22",
             "cosechada": false
+        },
+        {
+            "id": 7,
+            "idFinca": 1,
+            "nombre": "Prueba Tecnica",
+            "finca": "La Esperanza",
+            "zona": "Matagalpa",
+            "cultivo": "Tomate",
+            "area": 1,
+            "siembra": "2026-10-01",
+            "cosechada": false
         }
     ],
     "registros": [
@@ -177,6 +188,17 @@
             "valor": 22.2,
             "detalle": "",
             "nota": "Cayó mucha lluvia vo",
+            "autor": "Liam"
+        },
+        {
+            "id": 10,
+            "parcelaId": 1,
+            "idFinca": 1,
+            "tipo": "riego",
+            "fecha": "2026-10-22",
+            "valor": 1234,
+            "detalle": "prueba",
+            "nota": "test",
             "autor": "Liam"
         }
     ]

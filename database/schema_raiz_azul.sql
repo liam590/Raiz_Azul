@@ -141,6 +141,9 @@ BEGIN
         Valor DECIMAL(12,2) DEFAULT 0,
         Detalle NVARCHAR(120) NULL,
         Nota NVARCHAR(250) NULL,
+        MetodoRiego NVARCHAR(40) NULL,
+        DuracionMinutos INT NULL,
+        GrupoRiego NVARCHAR(40) NULL,
         IdUsuario INT NULL,
         NombreAutor NVARCHAR(100) NOT NULL,
         FechaHoraCreacion DATETIME2 DEFAULT SYSDATETIME(),
@@ -150,6 +153,20 @@ BEGIN
         CONSTRAINT FK_Reg_Usuarios FOREIGN KEY (IdUsuario) REFERENCES Usuarios(IdUsuario)
     );
 END
+GO
+
+-- Migración: riego en varias fechas, método y duración
+-- (idempotente para bases de datos ya creadas)
+IF COL_LENGTH('dbo.RegistrosCampo', 'MetodoRiego') IS NULL
+    ALTER TABLE RegistrosCampo ADD MetodoRiego NVARCHAR(40) NULL;
+GO
+
+IF COL_LENGTH('dbo.RegistrosCampo', 'DuracionMinutos') IS NULL
+    ALTER TABLE RegistrosCampo ADD DuracionMinutos INT NULL;
+GO
+
+IF COL_LENGTH('dbo.RegistrosCampo', 'GrupoRiego') IS NULL
+    ALTER TABLE RegistrosCampo ADD GrupoRiego NVARCHAR(40) NULL;
 GO
 
 -- Índices de consulta rápida
@@ -285,7 +302,10 @@ CREATE OR ALTER PROCEDURE sp_GuardarRegistroCampo
     @Detalle NVARCHAR(120) = NULL,
     @Nota NVARCHAR(250) = NULL,
     @IdUsuario INT = NULL,
-    @NombreAutor NVARCHAR(100)
+    @NombreAutor NVARCHAR(100),
+    @MetodoRiego NVARCHAR(40) = NULL,
+    @DuracionMinutos INT = NULL,
+    @GrupoRiego NVARCHAR(40) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -307,10 +327,12 @@ BEGIN
     END
 
     INSERT INTO RegistrosCampo (
-        IdFinca, IdParcela, IdTipoRegistro, Fecha, Valor, Detalle, Nota, IdUsuario, NombreAutor
+        IdFinca, IdParcela, IdTipoRegistro, Fecha, Valor, Detalle, Nota,
+        MetodoRiego, DuracionMinutos, GrupoRiego, IdUsuario, NombreAutor
     )
     VALUES (
-        @IdFinca, @IdParcela, @IdTipoRegistro, @Fecha, @Valor, @Detalle, @Nota, @IdUsuario, @NombreAutor
+        @IdFinca, @IdParcela, @IdTipoRegistro, @Fecha, @Valor, @Detalle, @Nota,
+        @MetodoRiego, @DuracionMinutos, @GrupoRiego, @IdUsuario, @NombreAutor
     );
 
     SELECT SCOPE_IDENTITY() AS IdRegistroGenerado;

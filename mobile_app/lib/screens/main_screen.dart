@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
-import '../core/constants.dart';
 import '../core/api_service.dart';
+import '../features/auth/providers/auth_provider.dart';
 import 'inicio_screen.dart';
 import 'parcelas_screen.dart';
 import 'calendario_screen.dart';
 import 'reportes_screen.dart';
 import '../widgets/registro_modal.dart';
 import '../widgets/nueva_parcela_modal.dart';
-import '../widgets/perfil_modal.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -66,20 +67,15 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _abrirPerfil() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => PerfilModal(
-        onPerfilGuardado: () => setState(() {}),
-      ),
-    );
+    context.push('/profile');
   }
 
   @override
   Widget build(BuildContext context) {
-    final String initial = AppConstants.userName.trim().isNotEmpty
-        ? AppConstants.userName.trim()[0].toUpperCase()
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.user;
+    final String initial = (user?.nombreCompleto.trim().isNotEmpty ?? false)
+        ? user!.nombreCompleto.trim()[0].toUpperCase()
         : 'P';
 
     return Scaffold(

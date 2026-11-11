@@ -25,4 +25,15 @@ class Alerta {
       cultivo: json['cultivo'],
     );
   }
+
+  factory Alerta.fromMap(Map<String, dynamic> map) {
+    return Alerta(
+      nivel: map['nivel'] ?? 'info',
+      titulo: map['titulo'] ?? '',
+      descripcion: map['descripcion'] ?? '',
+      parcelaId: map['parcelaId'],
+      parcelaNombre: map['parcelaNombre'],
+      cultivo: map['cultivo'],
+    );
+  }
 }

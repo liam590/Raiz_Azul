@@ -75,5 +75,6 @@ flutter run
   - Detección de ventanas de fertilización por cultivo.
 - **Gestión de Parcelas:** Creación, avance visual del ciclo, estimación de fecha de cosecha y detalle de labores.
 - **Botón Rápido de Registro (+):** Formulario para anotar Riego (L), Lluvia (mm), Insumos (lb) y Labores de campo.
+- **Riego en Varias Fechas:** Un mismo riego puede registrarse en varios días, indicando método (goteo, aspersión, gravedad, manual u otro) y duración en minutos por día. Se crea un registro por fecha para mantener reportes, calendario y alertas.
 - **Calendario Agrícola:** Visualización mensual con indicadores por tipo de labor y proyección de eventos futuros estimados.
 - **Reportes de Uso Eficiente:** Comparativa de agua por manzana ($L/\text{mz}$) y cálculo de litros de agua ahorrados.

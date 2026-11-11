@@ -16,6 +16,12 @@ class Parcela {
   final double porcentajeCiclo;
   final String etapaActual;
   final List<Alerta> recomendaciones;
+  
+  // Local DB fields
+  final int? syncStatus;
+  final int? serverId;
+  final int? idCultivo;
+  final int? idZona;
 
   Parcela({
     required this.id,
@@ -33,6 +39,10 @@ class Parcela {
     required this.porcentajeCiclo,
     required this.etapaActual,
     required this.recomendaciones,
+    this.syncStatus,
+    this.serverId,
+    this.idCultivo,
+    this.idZona,
   });
 
   factory Parcela.fromJson(Map<String, dynamic> json) {
@@ -55,6 +65,68 @@ class Parcela {
       porcentajeCiclo: (json['PorcentajeCiclo'] ?? 0.0).toDouble(),
       etapaActual: json['EtapaActual'] ?? 'Desarrollo',
       recomendaciones: recs,
+      syncStatus: json['sync_status'],
+      serverId: json['server_id'],
+      idCultivo: json['id_cultivo'],
+      idZona: json['id_zona'],
     );
+  }
+  
+  factory Parcela.fromLocalMap(Map<String, dynamic> map) {
+    return Parcela(
+      id: map['id'],
+      nombre: map['nombre'] ?? '',
+      idFinca: map['id_finca'] ?? 1,
+      finca: map['finca'] ?? '',
+      zona: map['zona'] ?? '',
+      cultivo: map['cultivo'] ?? '',
+      area: (map['area'] ?? 0.0).toDouble(),
+      siembra: map['siembra'] ?? '',
+      cosechada: (map['cosechada'] ?? 0) == 1,
+      cicloDias: map['ciclo_dias'] ?? 90,
+      diasDesdeSiembra: map['dias_desde_siembra'] ?? 0,
+      fechaEstimadaCosecha: map['fecha_estimada_cosecha'] ?? '',
+      porcentajeCiclo: (map['porcentaje_ciclo'] ?? 0.0).toDouble(),
+      etapaActual: map['etapa_actual'] ?? 'Desarrollo',
+      recomendaciones: [],
+      syncStatus: map['sync_status'],
+      serverId: map['server_id'],
+      idCultivo: map['id_cultivo'],
+      idZona: map['id_zona'],
+    );
+  }
+  
+  Map<String, dynamic> toLocalMap() {
+    return {
+      'id': id,
+      'id_finca': idFinca,
+      'nombre': nombre,
+      'finca': finca,
+      'zona': zona,
+      'cultivo': cultivo,
+      'area': area,
+      'siembra': siembra,
+      'cosechada': cosechada ? 1 : 0,
+      'ciclo_dias': cicloDias,
+      'dias_desde_siembra': diasDesdeSiembra,
+      'fecha_estimada_cosecha': fechaEstimadaCosecha,
+      'porcentaje_ciclo': porcentajeCiclo,
+      'etapa_actual': etapaActual,
+      'sync_status': syncStatus ?? 0,
+      'server_id': serverId,
+      'id_cultivo': idCultivo,
+      'id_zona': idZona,
+    };
+  }
+  
+  Map<String, dynamic> toServerMap() {
+    return {
+      'nombre': nombre,
+      'finca': finca,
+      'zona': zona,
+      'cultivo': cultivo,
+      'area': area,
+      'siembra': siembra,
+    };
   }
 }

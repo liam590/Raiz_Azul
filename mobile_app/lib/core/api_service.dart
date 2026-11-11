@@ -146,6 +146,10 @@ class ApiService {
     String detalle = '',
     String nota = '',
     required String autor,
+    List<String>? fechas,
+    String? metodoRiego,
+    int? duracionMinutos,
+    String? grupoRiego,
   }) async {
     try {
       final response = await http.post(
@@ -156,10 +160,14 @@ class ApiService {
           'idFinca': idFinca,
           'tipo': tipo,
           'fecha': fecha,
+          'fechas': fechas,
           'valor': valor,
           'detalle': detalle,
           'nota': nota,
           'autor': autor,
+          'metodoRiego': metodoRiego,
+          'duracionMinutos': duracionMinutos,
+          'grupoRiego': grupoRiego,
         }),
       ).timeout(const Duration(seconds: 5));
 
@@ -202,7 +210,7 @@ class ApiService {
   // 5. Reportes
   Future<Map<String, dynamic>> fetchReportes() async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/reportes.php'));
+      final response = await http.get(Uri.parse('$_baseUrl/reportes.php')).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         return decoded['data'] ?? {};

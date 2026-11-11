@@ -84,9 +84,9 @@ class DataStore {
                     ['id' => 2, 'parcelaId' => 'finca:La Esperanza', 'idFinca' => 1, 'tipo' => 'lluvia', 'fecha' => AgronomiaService::addDays($hoy, -9), 'valor' => 8, 'detalle' => '', 'nota' => '', 'autor' => 'Cristin'],
                     ['id' => 3, 'parcelaId' => 'finca:El Mirador', 'idFinca' => 2, 'tipo' => 'lluvia', 'fecha' => AgronomiaService::addDays($hoy, -1), 'valor' => 5, 'detalle' => '', 'nota' => '', 'autor' => 'Iris'],
                     // Riegos
-                    ['id' => 4, 'parcelaId' => 1, 'idFinca' => 1, 'tipo' => 'riego', 'fecha' => AgronomiaService::addDays($hoy, -4), 'valor' => 6700, 'detalle' => '', 'nota' => 'Riego por goteo', 'autor' => 'Liam'],
-                    ['id' => 5, 'parcelaId' => 2, 'idFinca' => 1, 'tipo' => 'riego', 'fecha' => AgronomiaService::addDays($hoy, -3), 'valor' => 8000, 'detalle' => '', 'nota' => 'Riego matutino', 'autor' => 'Cristin'],
-                    ['id' => 6, 'parcelaId' => 3, 'idFinca' => 2, 'tipo' => 'riego', 'fecha' => AgronomiaService::addDays($hoy, -4), 'valor' => 18000, 'detalle' => '', 'nota' => '', 'autor' => 'Iris'],
+                    ['id' => 4, 'parcelaId' => 1, 'idFinca' => 1, 'tipo' => 'riego', 'fecha' => AgronomiaService::addDays($hoy, -4), 'valor' => 6700, 'detalle' => '', 'nota' => 'Riego por goteo', 'metodoRiego' => 'Goteo', 'duracionMinutos' => 45, 'grupoRiego' => null, 'autor' => 'Liam'],
+                    ['id' => 5, 'parcelaId' => 2, 'idFinca' => 1, 'tipo' => 'riego', 'fecha' => AgronomiaService::addDays($hoy, -3), 'valor' => 8000, 'detalle' => '', 'nota' => 'Riego matutino', 'metodoRiego' => 'Aspersión', 'duracionMinutos' => 60, 'grupoRiego' => null, 'autor' => 'Cristin'],
+                    ['id' => 6, 'parcelaId' => 3, 'idFinca' => 2, 'tipo' => 'riego', 'fecha' => AgronomiaService::addDays($hoy, -4), 'valor' => 18000, 'detalle' => '', 'nota' => '', 'metodoRiego' => 'Gravedad', 'duracionMinutos' => 90, 'grupoRiego' => null, 'autor' => 'Iris'],
                     // Insumos
                     ['id' => 7, 'parcelaId' => 1, 'idFinca' => 1, 'tipo' => 'insumo', 'fecha' => AgronomiaService::addDays($hoy, -17), 'valor' => 90, 'detalle' => 'Fórmula 12-30-10', 'nota' => '1.ª fertilización', 'autor' => 'Cristin'],
                     // Labores
@@ -229,6 +229,7 @@ class DataStore {
         if ($this->conn) {
             $sql = "SELECT r.IdRegistro, r.IdFinca, r.IdParcela, t.Codigo AS TipoCodigo, t.Nombre AS TipoNombre,
                            r.Fecha, r.Valor, r.Detalle, r.Nota, r.NombreAutor,
+                           r.MetodoRiego, r.DuracionMinutos, r.GrupoRiego,
                            ISNULL(p.NombreParcela, CONCAT('Toda la finca ', f.NombreFinca)) AS Destino
                     FROM RegistrosCampo r
                     INNER JOIN TiposRegistro t ON r.IdTipoRegistro = t.IdTipoRegistro
@@ -251,7 +252,7 @@ class DataStore {
         return array_values($regs);
     }
 
-    public function agregarRegistro($idFinca, $idParcela, $tipo, $fecha, $valor, $detalle, $nota, $nombreAutor) {
+    public function agregarRegistro($idFinca, $idParcela, $tipo, $fecha, $valor, $detalle, $nota, $nombreAutor, $metodoRiego = null, $duracionMinutos = null, $grupoRiego = null) {
         if ($this->conn) {
             $stmt = $this->conn->prepare("EXEC sp_GuardarRegistroCampo 
                 @IdFinca = :idFinca, 
@@ -261,7 +262,10 @@ class DataStore {
                 @Valor = :valor, 
                 @Detalle = :detalle, 
                 @Nota = :nota, 
-                @NombreAutor = :autor");
+                @NombreAutor = :autor,
+                @MetodoRiego = :metodoRiego,
+                @DuracionMinutos = :duracionMinutos,
+                @GrupoRiego = :grupoRiego");
             $stmt->execute([
                 ':idFinca' => $idFinca,
                 ':idParcela' => $idParcela,
@@ -270,7 +274,10 @@ class DataStore {
                 ':valor' => $valor,
                 ':detalle' => $detalle,
                 ':nota' => $nota,
-                ':autor' => $nombreAutor
+                ':autor' => $nombreAutor,
+                ':metodoRiego' => $metodoRiego,
+                ':duracionMinutos' => $duracionMinutos,
+                ':grupoRiego' => $grupoRiego
             ]);
             $row = $stmt->fetch();
             return $row['IdRegistroGenerado'] ?? 0;
@@ -287,6 +294,9 @@ class DataStore {
             'valor' => (float)$valor,
             'detalle' => $detalle ?? '',
             'nota' => $nota ?? '',
+            'metodoRiego' => $tipo === 'riego' ? $metodoRiego : null,
+            'duracionMinutos' => $tipo === 'riego' ? $duracionMinutos : null,
+            'grupoRiego' => $tipo === 'riego' ? $grupoRiego : null,
             'autor' => $nombreAutor ?: 'Productor'
         ];
         $data['registros'][] = $nuevo;

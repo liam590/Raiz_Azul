@@ -21,7 +21,14 @@ try {
         $det = $r['detalle'] ?? $r['Detalle'] ?? '';
 
         $desc = '';
-        if ($tipo === 'riego') $desc = "Riego · " . number_format($val, 0) . " L";
+        if ($tipo === 'riego') {
+            $metodo = trim($r['metodoRiego'] ?? $r['MetodoRiego'] ?? '');
+            $duracion = $r['duracionMinutos'] ?? $r['DuracionMinutos'] ?? null;
+
+            $desc = "Riego · " . number_format($val, 0) . " L";
+            if ($metodo !== '') $desc .= " · " . $metodo;
+            if (!empty($duracion)) $desc .= " · " . intval($duracion) . " min";
+        }
         elseif ($tipo === 'lluvia') $desc = "Lluvia · " . number_format($val, 1) . " mm";
         elseif ($tipo === 'insumo') $desc = ($det ?: 'Insumo') . " · " . number_format($val, 1) . " lb";
         else $desc = $det ?: 'Labor';
