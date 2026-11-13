@@ -16,7 +16,7 @@ class ApiService {
   // 1. Dashboard
   Future<Map<String, dynamic>> fetchDashboard() async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/dashboard.php'));
+      final response = await http.get(Uri.parse('$_baseUrl/dashboard.php')).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final data = decoded['data'] ?? {};
@@ -58,7 +58,7 @@ class ApiService {
   // 2. Parcelas
   Future<List<Parcela>> fetchParcelas() async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/parcelas.php'));
+      final response = await http.get(Uri.parse('$_baseUrl/parcelas.php')).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final list = decoded['data'] as List? ?? [];
@@ -187,7 +187,7 @@ class ApiService {
 
   Future<bool> eliminarRegistro(dynamic id) async {
     try {
-      final response = await http.delete(Uri.parse('$_baseUrl/registros.php?id=$id'));
+      final response = await http.delete(Uri.parse('$_baseUrl/registros.php?id=$id')).timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (_) {
       return false;
@@ -197,7 +197,7 @@ class ApiService {
   // 4. Calendario
   Future<List<EventoCalendario>> fetchCalendario() async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/calendario.php'));
+      final response = await http.get(Uri.parse('$_baseUrl/calendario.php')).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final list = decoded['data'] as List? ?? [];
@@ -222,7 +222,7 @@ class ApiService {
   // 6. Catálogos
   Future<Map<String, dynamic>> fetchCatalogos() async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/catalogos.php'));
+      final response = await http.get(Uri.parse('$_baseUrl/catalogos.php')).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         return decoded['data'] ?? {};

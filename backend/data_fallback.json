@@ -81,12 +81,12 @@
         {
             "id": 7,
             "idFinca": 1,
-            "nombre": "Prueba Tecnica",
+            "nombre": "Tomates",
             "finca": "La Esperanza",
             "zona": "Matagalpa",
             "cultivo": "Tomate",
-            "area": 1,
-            "siembra": "2026-10-01",
+            "area": 1.5,
+            "siembra": "2026-11-12",
             "cosechada": false
         }
     ],
@@ -200,6 +200,34 @@
             "detalle": "prueba",
             "nota": "test",
             "autor": "Liam"
+        },
+        {
+            "id": 11,
+            "parcelaId": 6,
+            "idFinca": 1,
+            "tipo": "riego",
+            "fecha": "2026-11-12",
+            "valor": 6750,
+            "detalle": "Riego",
+            "nota": "",
+            "metodoRiego": "Goteo",
+            "duracionMinutos": null,
+            "grupoRiego": null,
+            "autor": "Crispin"
+        },
+        {
+            "id": 12,
+            "parcelaId": 6,
+            "idFinca": 1,
+            "tipo": "insumo",
+            "fecha": "2026-11-12",
+            "valor": 10,
+            "detalle": "Fórmula 12-30-10",
+            "nota": "",
+            "metodoRiego": null,
+            "duracionMinutos": null,
+            "grupoRiego": null,
+            "autor": "Crispin"
         }
     ]
 }

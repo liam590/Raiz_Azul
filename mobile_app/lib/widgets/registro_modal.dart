@@ -8,13 +8,29 @@ import '../features/auth/providers/auth_provider.dart';
 
 class RegistroModal extends StatefulWidget {
   final dynamic initialParcelaId;
+  final String? initialParcelaNombre;
+  final int? initialIdFinca;
   final String? initialFecha;
+  final String? initialTipo;
+  final String? initialDetalle;
+  final double? initialValor;
+  final String? initialNota;
+  final String? initialMetodoRiego;
+  final bool lockParcela;
   final VoidCallback onRegistroGuardado;
 
   const RegistroModal({
     super.key,
     this.initialParcelaId,
+    this.initialParcelaNombre,
+    this.initialIdFinca,
     this.initialFecha,
+    this.initialTipo,
+    this.initialDetalle,
+    this.initialValor,
+    this.initialNota,
+    this.initialMetodoRiego,
+    this.lockParcela = false,
     required this.onRegistroGuardado,
   });
 
@@ -38,6 +54,7 @@ class _RegistroModalState extends State<RegistroModal> {
   final TextEditingController _notaCtrl = TextEditingController();
 
   bool _cargandoParcelas = true;
+  String? _errorParcelas;
   bool _guardando = false;
   List<Parcela> _parcelas = [];
 
@@ -45,15 +62,39 @@ class _RegistroModalState extends State<RegistroModal> {
   final List<String> _labores = ['Deshierbe', 'Aporque', 'Poda', 'Control de plagas', 'Control de enfermedades', 'Cosecha', 'Otra'];
   final List<String> _metodosRiego = ['Goteo', 'Aspersión', 'Gravedad', 'Manual', 'Otro'];
 
+  /// Cuando se llega desde el detalle de una parcela, no hace falta esperar
+  /// al listado para poder registrar: ya sabemos en qué lote estamos.
+  bool get _puedeRegistrarSinLista =>
+      widget.lockParcela && widget.initialParcelaId != null;
+
   @override
   void initState() {
     super.initState();
     if (widget.initialFecha != null) {
       _fecha = DateTime.tryParse(widget.initialFecha!) ?? DateTime.now();
     }
+    const tiposValidos = ['riego', 'lluvia', 'labor', 'insumo'];
+    if (widget.initialTipo != null && tiposValidos.contains(widget.initialTipo)) {
+      _tipo = widget.initialTipo!;
+    }
+    if (widget.initialMetodoRiego != null) {
+      _metodoRiego = widget.initialMetodoRiego!;
+    }
+    if (widget.initialValor != null) {
+      _valorCtrl.text = _formatoValor(widget.initialValor!);
+    }
+    if (widget.initialDetalle != null) {
+      _detalleCtrl.text = widget.initialDetalle!;
+    }
+    if (widget.initialNota != null) {
+      _notaCtrl.text = widget.initialNota!;
+    }
     _fechasRiego = [_fecha];
     _cargarParcelas();
   }
+
+  static String _formatoValor(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
   @override
   void dispose() {
@@ -65,20 +106,40 @@ class _RegistroModalState extends State<RegistroModal> {
   }
 
   Future<void> _cargarParcelas() async {
-    final list = await _api.fetchParcelas();
-    if (mounted) {
-      setState(() {
-        _parcelas = list;
-        _cargandoParcelas = false;
-        final inicialExiste = widget.initialParcelaId != null &&
-            _parcelas.any((p) => p.id == widget.initialParcelaId);
-        if (inicialExiste) {
-          _parcelaSeleccionada = widget.initialParcelaId;
-        } else if (_parcelas.isNotEmpty) {
-          _parcelaSeleccionada = _parcelas.first.id;
-        }
-      });
+    List<Parcela> list = [];
+    String? error;
+
+    try {
+      list = await _api.fetchParcelas();
+    } catch (_) {
+      error = 'No se pudieron cargar las parcelas. Revisa tu conexión o la base local.';
     }
+
+    if (!mounted) return;
+    setState(() {
+      _parcelas = list;
+      _errorParcelas = error;
+      _cargandoParcelas = false;
+
+      final inicialExiste = widget.initialParcelaId != null &&
+          _parcelas.any((p) => p.id == widget.initialParcelaId);
+      if (inicialExiste) {
+        _parcelaSeleccionada = widget.initialParcelaId;
+      } else if (_puedeRegistrarSinLista) {
+        // Venimos del detalle: usamos esa parcela aunque el listado falle.
+        _parcelaSeleccionada = widget.initialParcelaId;
+      } else if (error == null && _parcelas.isNotEmpty) {
+        _parcelaSeleccionada = _parcelas.first.id;
+      }
+    });
+  }
+
+  void _reintentarParcelas() {
+    setState(() {
+      _cargandoParcelas = true;
+      _errorParcelas = null;
+    });
+    _cargarParcelas();
   }
 
   Future<void> _guardar() async {
@@ -94,6 +155,9 @@ class _RegistroModalState extends State<RegistroModal> {
       return;
     }
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() => _guardando = true);
     final valor = double.tryParse(_valorCtrl.text.trim()) ?? 0.0;
     final fechas = _tipo == 'riego'
@@ -101,42 +165,56 @@ class _RegistroModalState extends State<RegistroModal> {
         : [DateFormat('yyyy-MM-dd').format(_fecha)];
     final duracion = int.tryParse(_duracionCtrl.text.trim());
 
-    final resultado = await _api.crearRegistro(
-      idParcela: _parcelaSeleccionada,
-      idFinca: _idFincaSeleccionada(),
-      tipo: _tipo,
-      fecha: fechas.first,
-      fechas: fechas,
-      valor: _tipo == 'labor' ? 0.0 : valor,
-      detalle: _detalleCtrl.text.trim(),
-      nota: _notaCtrl.text.trim(),
-      autor: context.read<AuthProvider>().user?.nombreCompleto ?? 'Usuario',
-      metodoRiego: _tipo == 'riego' ? _metodoRiego : null,
-      duracionMinutos: _tipo == 'riego' ? duracion : null,
-      grupoRiego: (_tipo == 'riego' && fechas.length > 1)
-          ? DateTime.now().microsecondsSinceEpoch.toString()
-          : null,
-    );
+    try {
+      final resultado = await _api.crearRegistro(
+        idParcela: _parcelaSeleccionada,
+        idFinca: _idFincaSeleccionada(),
+        tipo: _tipo,
+        fecha: fechas.first,
+        fechas: fechas,
+        valor: _tipo == 'labor' ? 0.0 : valor,
+        detalle: _detalleCtrl.text.trim(),
+        nota: _notaCtrl.text.trim(),
+        autor: context.read<AuthProvider>().user?.nombreCompleto ?? 'Usuario',
+        metodoRiego: _tipo == 'riego' ? _metodoRiego : null,
+        duracionMinutos: _tipo == 'riego' ? duracion : null,
+        grupoRiego: (_tipo == 'riego' && fechas.length > 1)
+            ? DateTime.now().microsecondsSinceEpoch.toString()
+            : null,
+      );
 
-    if (mounted) {
-      setState(() => _guardando = false);
+      if (!mounted) return;
       if (resultado.success) {
-        Navigator.pop(context);
+        navigator.pop();
         widget.onRegistroGuardado();
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             backgroundColor: AppColors.brote,
             content: Text(resultado.message),
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             backgroundColor: AppColors.alerta,
             content: Text(resultado.message),
             duration: const Duration(seconds: 4),
           ),
         );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.alerta,
+            content: Text('No se pudo guardar el registro: $e'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _guardando = false);
       }
     }
   }
@@ -154,7 +232,44 @@ class _RegistroModalState extends State<RegistroModal> {
       );
     }
 
-    if (_parcelas.isEmpty) {
+    if (_errorParcelas != null && !_puedeRegistrarSinLista) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 40, color: AppColors.muted),
+            const SizedBox(height: 12),
+            Text(
+              _errorParcelas!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.muted),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cerrar'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _reintentarParcelas,
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_parcelas.isEmpty && !_puedeRegistrarSinLista) {
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: const BoxDecoration(
@@ -219,28 +334,31 @@ class _RegistroModalState extends State<RegistroModal> {
               const SizedBox(height: 14),
 
               // Selector de Parcela o Finca
-              DropdownButtonFormField<dynamic>(
-                key: ValueKey('parcela_$_tipo'),
-                initialValue: _parcelaSeleccionada,
-                decoration: InputDecoration(
-                  labelText: 'PARCELA',
-                  filled: true,
-                  fillColor: AppColors.surface2,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.line)),
-                ),
-                items: [
-                  ..._parcelas.map((p) => DropdownMenuItem(
-                        value: p.id,
-                        child: Text('${p.nombre} · ${p.cultivo}', overflow: TextOverflow.ellipsis),
-                      )),
-                  if (_tipo == 'lluvia')
-                    ...{for (var p in _parcelas) p.finca}.map((finca) => DropdownMenuItem(
-                          value: 'finca:$finca',
-                          child: Text('Toda la finca $finca', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.lluvia)),
+              if (widget.lockParcela && _parcelaSeleccionada != null)
+                _buildParcelaFija()
+              else
+                DropdownButtonFormField<dynamic>(
+                  key: ValueKey('parcela_$_tipo'),
+                  initialValue: _parcelaSeleccionada,
+                  decoration: InputDecoration(
+                    labelText: 'PARCELA',
+                    filled: true,
+                    fillColor: AppColors.surface2,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.line)),
+                  ),
+                  items: [
+                    ..._parcelas.map((p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Text('${p.nombre} · ${p.cultivo}', overflow: TextOverflow.ellipsis),
                         )),
-                ],
-                onChanged: (v) => setState(() => _parcelaSeleccionada = v),
-              ),
+                    if (_tipo == 'lluvia')
+                      ...{for (var p in _parcelas) p.finca}.map((finca) => DropdownMenuItem(
+                            value: 'finca:$finca',
+                            child: Text('Toda la finca $finca', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.lluvia)),
+                          )),
+                  ],
+                  onChanged: (v) => setState(() => _parcelaSeleccionada = v),
+                ),
               const SizedBox(height: 12),
 
               // Selector de fecha única o fechas múltiples para riego
@@ -327,6 +445,8 @@ class _RegistroModalState extends State<RegistroModal> {
                 Column(
                   children: [
                     DropdownButtonFormField<String>(
+                      key: ValueKey('insumo_$_tipo'),
+                      initialValue: _insumos.contains(_detalleCtrl.text) ? _detalleCtrl.text : null,
                       decoration: InputDecoration(
                         labelText: 'INSUMO',
                         filled: true,
@@ -354,6 +474,8 @@ class _RegistroModalState extends State<RegistroModal> {
                 )
               else
                 DropdownButtonFormField<String>(
+                  key: ValueKey('labor_$_tipo'),
+                  initialValue: _labores.contains(_detalleCtrl.text) ? _detalleCtrl.text : null,
                   decoration: InputDecoration(
                     labelText: 'LABOR REALIZADA',
                     filled: true,
@@ -397,6 +519,42 @@ class _RegistroModalState extends State<RegistroModal> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildParcelaFija() {
+    final match = _parcelas.where((p) => p.id == _parcelaSeleccionada).toList();
+    final nombre = match.isNotEmpty
+        ? '${match.first.nombre} · ${match.first.cultivo}'
+        : (widget.initialParcelaNombre ?? 'Parcela seleccionada');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.landscape, size: 18, color: AppColors.brote),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('PARCELA', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.muted)),
+                const SizedBox(height: 2),
+                Text(
+                  nombre,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -592,7 +750,7 @@ class _RegistroModalState extends State<RegistroModal> {
     if (parcela.isNotEmpty) {
       return int.tryParse(parcela.first.idFinca.toString()) ?? 1;
     }
-    return 1;
+    return widget.initialIdFinca ?? 1;
   }
 
   Widget _tipoBtn(String tipoId, String label, IconData icon) {
@@ -601,6 +759,7 @@ class _RegistroModalState extends State<RegistroModal> {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
+          if (_tipo == tipoId) return;
           setState(() {
             _tipo = tipoId;
             _valorCtrl.clear();

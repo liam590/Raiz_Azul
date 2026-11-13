@@ -27,7 +27,20 @@ class OfflineApiService {
     } catch (_) {}
     
     // Fallback to local
-    return _buildLocalDashboard();
+    try {
+      return await _buildLocalDashboard();
+    } catch (_) {
+      return {
+        'totalParcelas': 0,
+        'litrosRegados7Dias': 0.0,
+        'totalAlertas': 0,
+        'ahorroPotencialLitros': 0.0,
+        'alertas': <Alerta>[],
+        'actividadReciente': <Registro>[],
+        'isSqlServer': false,
+        'driver': 'local_sqlite',
+      };
+    }
   }
   
   Future<Map<String, dynamic>> _buildLocalDashboard() async {
@@ -113,29 +126,56 @@ class OfflineApiService {
   // ==================== PARCELAS ====================
   
   Future<List<Parcela>> fetchParcelas({int? idFinca}) async {
+    List<Parcela>? serverParcelas;
+
     // Try online first
     try {
-      final serverParcelas = await _api.fetchParcelas();
+      serverParcelas = await _api.fetchParcelas();
       if (serverParcelas.isNotEmpty) {
         // Merge with local (local takes precedence for pending changes)
         await _mergeParcelas(serverParcelas);
       }
     } catch (_) {}
-    
+
     // Return local
-    return _localDb.getParcelas(idFinca: idFinca);
+    List<Parcela> local = [];
+    try {
+      local = await _localDb.getParcelas(idFinca: idFinca);
+    } catch (_) {}
+
+    // Si el caché local falló pero el servidor sí tiene datos, no dejamos la
+    // UI sin parcelas: devolvemos lo que vino del servidor.
+    if (local.isEmpty && serverParcelas != null && serverParcelas.isNotEmpty) {
+      if (idFinca == null) return serverParcelas;
+      return serverParcelas
+          .where((p) => int.tryParse(p.idFinca.toString()) == idFinca)
+          .toList();
+    }
+
+    return local;
   }
   
   Future<void> _mergeParcelas(List<Parcela> serverParcelas) async {
+    final db = await _localDb.database;
+
     for (final sp in serverParcelas) {
-      final local = await _localDb.getParcela(sp.id as int);
-      if (local == null || local.syncStatus == 0) {
-        // No local version or local is synced - update from server
-        await _localDb.database.then((db) => db.insert(
+      final serverId = int.tryParse(sp.id.toString());
+      if (serverId == null) continue;
+
+      try {
+        final local = await _localDb.getParcela(serverId);
+        if (local != null && local.syncStatus != 0) {
+          // Hay cambios locales pendientes: no pisar con la versión del servidor.
+          continue;
+        }
+
+        // Solo columnas reales de la tabla local. Los campos derivados
+        // (ciclo, días, etapa, etc.) se calculan al leer.
+        await db.insert(
           LocalDatabase.tableParcelas,
           {
-            'id': sp.id,
-            'id_finca': sp.idFinca,
+            'id': serverId,
+            'id_finca': int.tryParse(sp.idFinca.toString()) ?? 1,
             'nombre': sp.nombre,
             'finca': sp.finca,
             'zona': sp.zona,
@@ -143,17 +183,14 @@ class OfflineApiService {
             'area': sp.area,
             'siembra': sp.siembra,
             'cosechada': sp.cosechada ? 1 : 0,
-            'ciclo_dias': sp.cicloDias,
-            'dias_desde_siembra': sp.diasDesdeSiembra,
-            'fecha_estimada_cosecha': sp.fechaEstimadaCosecha,
-            'porcentaje_ciclo': sp.porcentajeCiclo,
-            'etapa_actual': sp.etapaActual,
             'sync_status': 0,
-            'server_id': sp.id,
+            'server_id': serverId,
             'updated_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
-        ));
+        );
+      } catch (_) {
+        // Una fila problemática no debe impedir cachear las demás.
       }
     }
   }
@@ -173,24 +210,36 @@ class OfflineApiService {
         cultivo: cultivo, area: area, siembra: siembra,
       );
       if (result.success) {
+        // Refresca el caché local para que la parcela recién creada también
+        // esté disponible si se corta la conexión justo después.
+        try {
+          await fetchParcelas();
+        } catch (_) {}
         return result;
       }
     } catch (_) {}
     
     // Offline - save to local DB
-    final newId = await _localDb.insertParcela({
-      'nombre': nombre,
-      'id_finca': 1, // TODO: resolve finca name to ID
-      'finca': finca,
-      'zona': zona,
-      'cultivo': cultivo,
-      'area': area,
-      'siembra': siembra,
-      'cosechada': 0,
-      'sync_status': 1, // pending_create
-    });
-    
-    return (success: true, message: 'Parcela guardada localmente (se sincronizará al conectar). ID local: $newId');
+    try {
+      final newId = await _localDb.insertParcela({
+        'nombre': nombre,
+        'id_finca': 1, // TODO: resolve finca name to ID
+        'finca': finca,
+        'zona': zona,
+        'cultivo': cultivo,
+        'area': area,
+        'siembra': siembra,
+        'cosechada': 0,
+        'sync_status': 1, // pending_create
+      });
+      
+      return (success: true, message: 'Parcela guardada localmente (se sincronizará al conectar). ID local: $newId');
+    } catch (e) {
+      return (
+        success: false,
+        message: 'No se pudo guardar la parcela localmente: $e'
+      );
+    }
   }
   
   Future<bool> eliminarParcela(dynamic id) async {
@@ -199,23 +248,40 @@ class OfflineApiService {
     } catch (_) {}
     
     // Always delete locally (soft delete for sync)
-    await _localDb.deleteParcela(id as int);
-    return true;
+    try {
+      await _localDb.deleteParcela(id as int);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
   
   // ==================== REGISTROS ====================
   
   Future<List<Registro>> fetchRegistros({dynamic idParcela}) async {
+    List<Registro>? serverRegistros;
+
     try {
-      final serverRegistros = await _api.fetchRegistros(idParcela: idParcela);
+      serverRegistros = await _api.fetchRegistros(idParcela: idParcela);
       if (serverRegistros.isNotEmpty) {
         await _mergeRegistros(serverRegistros);
       }
     } catch (_) {}
-    
-    return _localDb.getRegistros(
-      idParcela: idParcela is int ? idParcela : null,
-    );
+
+    List<Registro> local = [];
+    try {
+      local = await _localDb.getRegistros(
+        idParcela: idParcela is int ? idParcela : null,
+      );
+    } catch (_) {}
+
+    // Igual que con las parcelas: si el caché local quedó vacío pero el
+    // servidor devolvió historial, mostramos el del servidor.
+    if (local.isEmpty && serverRegistros != null && serverRegistros.isNotEmpty) {
+      return serverRegistros;
+    }
+
+    return local;
   }
   
   Future<void> _mergeRegistros(List<Registro> serverRegistros) async {
@@ -240,24 +306,28 @@ class OfflineApiService {
         'updated_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       };
 
-      // Buscar por server_id para no pisar registros locales pendientes
-      // que todavía no tienen ID del servidor.
-      final existentes = await db.query(
-        LocalDatabase.tableRegistros,
-        columns: ['id'],
-        where: 'server_id = ?',
-        whereArgs: [sr.id],
-      );
-
-      if (existentes.isNotEmpty) {
-        await db.update(
+      try {
+        // Buscar por server_id para no pisar registros locales pendientes
+        // que todavía no tienen ID del servidor.
+        final existentes = await db.query(
           LocalDatabase.tableRegistros,
-          datos,
-          where: 'id = ?',
-          whereArgs: [existentes.first['id']],
+          columns: ['id'],
+          where: 'server_id = ?',
+          whereArgs: [sr.id],
         );
-      } else {
-        await db.insert(LocalDatabase.tableRegistros, datos);
+
+        if (existentes.isNotEmpty) {
+          await db.update(
+            LocalDatabase.tableRegistros,
+            datos,
+            where: 'id = ?',
+            whereArgs: [existentes.first['id']],
+          );
+        } else {
+          await db.insert(LocalDatabase.tableRegistros, datos);
+        }
+      } catch (_) {
+        // Un registro problemático no debe impedir cachear los demás.
       }
     }
   }
@@ -303,22 +373,29 @@ class OfflineApiService {
     } catch (_) {}
     
     // Offline - save to local DB
-    for (final f in listaFechas) {
-      await _localDb.insertRegistro({
-        'id_parcela': idParcela,
-        'id_finca': idFinca,
-        'tipo': tipo,
-        'fecha': f,
-        'valor': valor,
-        'detalle': detalle,
-        'nota': nota,
-        'metodo_riego': metodoRiego,
-        'duracion_minutos': duracionMinutos,
-        'grupo_riego': grupoRiego,
-        'autor': autor,
-        'destino': 'Parcela', // Will be resolved later
-        'sync_status': 1,
-      });
+    try {
+      for (final f in listaFechas) {
+        await _localDb.insertRegistro({
+          'id_parcela': idParcela,
+          'id_finca': idFinca,
+          'tipo': tipo,
+          'fecha': f,
+          'valor': valor,
+          'detalle': detalle,
+          'nota': nota,
+          'metodo_riego': metodoRiego,
+          'duracion_minutos': duracionMinutos,
+          'grupo_riego': grupoRiego,
+          'autor': autor,
+          'destino': 'Parcela', // Will be resolved later
+          'sync_status': 1,
+        });
+      }
+    } catch (e) {
+      return (
+        success: false,
+        message: 'No se pudo guardar el registro localmente: $e'
+      );
     }
     
     final mensaje = listaFechas.length > 1
@@ -332,8 +409,12 @@ class OfflineApiService {
       await _api.eliminarRegistro(id);
     } catch (_) {}
     
-    await _localDb.deleteRegistro(id as int);
-    return true;
+    try {
+      await _localDb.deleteRegistro(id as int);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
   
   // ==================== CATALOGOS ====================
@@ -383,7 +464,16 @@ class OfflineApiService {
       }
     } catch (_) {}
     // Fallback to local calculation
-    return _buildLocalReportes();
+    try {
+      return await _buildLocalReportes();
+    } catch (_) {
+      return {
+        'totalAguaRiego': 0.0,
+        'lluviaPromedioMm': 0.0,
+        'ahorroPotencialLitros': 0.0,
+        'parcelas': <Map<String, dynamic>>[],
+      };
+    }
   }
   
   Future<Map<String, dynamic>> _buildLocalReportes() async {

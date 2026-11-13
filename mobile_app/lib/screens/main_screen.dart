@@ -195,9 +195,7 @@ class _MainScreenState extends State<MainScreen> {
             onNuevaParcelaTap: _abrirNuevaParcela,
             onParcelaTap: (pid) => _abrirRegistro(parcelaId: pid),
           ),
-          ParcelasScreen(
-            onRegistrarTap: (pid) => _abrirRegistro(parcelaId: pid),
-          ),
+          const ParcelasScreen(),
           CalendarioScreen(
             onRegistrarDiaTap: (fecha) => _abrirRegistro(fecha: fecha),
           ),

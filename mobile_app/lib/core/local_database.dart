@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/parcela.dart';
 import '../models/registro.dart';
+import 'agronomia_service.dart';
 
 class LocalDatabase {
   static const _dbName = 'raiz_azul.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
   static Database? _database;
+  static Future<Database>? _opening;
   
   // Table names
   static const String tableParcelas = 'parcelas';
@@ -25,20 +29,47 @@ class LocalDatabase {
   
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDb();
-    return _database!;
+    return _opening ??= _openDatabase();
+  }
+
+  Future<Database> _openDatabase() async {
+    try {
+      final db = await _initDb();
+      _database = db;
+      return db;
+    } finally {
+      // Permite reintentar si la apertura falló.
+      _opening = null;
+    }
   }
   
   Future<Database> _initDb() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
-    
-    return await openDatabase(
-      path,
-      version: _dbVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    try {
+      final dbPath = await _databaseDirectory();
+      final path = join(dbPath, _dbName);
+      
+      return await openDatabase(
+        path,
+        version: _dbVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    } catch (e, stack) {
+      debugPrint('LocalDatabase: no se pudo abrir la base local: $e\n$stack');
+      rethrow;
+    }
+  }
+
+  Future<String> _databaseDirectory() async {
+    // En escritorio conviene una ruta estable de la app (AppData en Windows)
+    // en lugar del directorio de trabajo desde donde se ejecute el binario.
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux)) {
+      final dir = await getApplicationSupportDirectory();
+      return dir.path;
+    }
+    return getDatabasesPath();
   }
   
   Future<void> _onCreate(Database db, int version) async {
@@ -108,6 +139,7 @@ class LocalDatabase {
         duracion_minutos INTEGER,
         grupo_riego TEXT,
         autor TEXT,
+        destino TEXT,
         sync_status INTEGER DEFAULT 0, -- 0=synced, 1=pending_create, 2=pending_update, 3=pending_delete
         server_id INTEGER,
         updated_at INTEGER DEFAULT (strftime('%s', 'now')),
@@ -182,6 +214,10 @@ class LocalDatabase {
       await _addColumnIfMissing(db, tableRegistros, 'metodo_riego', 'TEXT');
       await _addColumnIfMissing(db, tableRegistros, 'duracion_minutos', 'INTEGER');
       await _addColumnIfMissing(db, tableRegistros, 'grupo_riego', 'TEXT');
+    }
+    if (oldVersion < 3) {
+      // El servidor envía `destino` (Parcela/Finca) en los registros.
+      await _addColumnIfMissing(db, tableRegistros, 'destino', 'TEXT');
     }
   }
 
@@ -258,6 +294,26 @@ class LocalDatabase {
     return result;
   }
   
+  /// Completa los campos derivados (ciclo, día, etapa, cosecha estimada) que
+  /// no se guardan en la tabla local, para que el modo offline los muestre
+  /// siempre actualizados.
+  Map<String, dynamic> _withEtapa(Map<String, dynamic> map) {
+    try {
+      final etapa = AgronomiaService.calcularEtapa(
+        (map['cultivo'] as String?) ?? 'Maíz',
+        (map['siembra'] as String?) ?? '',
+      );
+      map['ciclo_dias'] = etapa['ciclo'];
+      map['dias_desde_siembra'] = etapa['dias'];
+      map['fecha_estimada_cosecha'] = etapa['fechaCosechaEstimada'];
+      map['porcentaje_ciclo'] = (etapa['pct'] as num) * 100;
+      map['etapa_actual'] = etapa['etapa'];
+    } catch (_) {
+      // Si el cultivo o la fecha vienen raros, se usan los valores por defecto.
+    }
+    return map;
+  }
+
   Future<List<Parcela>> getParcelas({int? idFinca}) async {
     final db = await database;
     final where = idFinca != null ? 'id_finca = ?' : null;
@@ -270,7 +326,9 @@ class LocalDatabase {
       orderBy: 'nombre ASC',
     );
     
-    return maps.map((m) => Parcela.fromLocalMap(m)).toList();
+    return maps
+        .map((m) => Parcela.fromLocalMap(_withEtapa(Map<String, dynamic>.from(m))))
+        .toList();
   }
   
   Future<Parcela?> getParcela(int id) async {
@@ -281,7 +339,7 @@ class LocalDatabase {
       whereArgs: [id],
     );
     if (maps.isEmpty) return null;
-    return Parcela.fromLocalMap(maps.first);
+    return Parcela.fromLocalMap(_withEtapa(Map<String, dynamic>.from(maps.first)));
   }
   
   // ==================== REGISTROS ====================
@@ -483,6 +541,17 @@ class LocalDatabase {
     if (_database != null) {
       await _database!.close();
       _database = null;
+    }
+  }
+
+  /// Abre (o crea) la base local de forma controlada.
+  /// Devuelve `false` si SQLite no está disponible en la plataforma.
+  Future<bool> initialize() async {
+    try {
+      await database;
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 }

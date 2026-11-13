@@ -119,6 +119,12 @@ class AgronomiaService {
         $dia = $diff->invert ? 0 : $diff->days;
         $rest = $c['ciclo'] - $dia;
 
+        // Litros de referencia para un riego: consumo del cultivo (L/mz) × área
+        $area = floatval($parcela['area'] ?? $parcela['Area'] ?? $parcela['AreaManzanas'] ?? 1);
+        if ($area <= 0) $area = 1;
+        $litros = round($c['ref'] * $area);
+        $insumosSugeridos = ['Fórmula 12-30-10', 'Urea 46%', 'Fórmula 15-15-15'];
+
         // Lluvias de la parcela o de la finca general
         $lluvias = array_filter($registros, function($r) use ($parcelaId, $fincaNombre) {
             $tipo = $r['tipo'] ?? $r['TipoCodigo'] ?? '';
@@ -161,13 +167,23 @@ class AgronomiaService {
             $out[] = [
                 'nivel' => 'alerta',
                 'titulo' => 'Cosecha estimada cumplida',
-                'descripcion' => "El ciclo de " . strtolower($cultivo) . " ({$c['ciclo']} días) ya terminó. Confirmar el punto de cosecha en campo."
+                'descripcion' => "El ciclo de " . strtolower($cultivo) . " ({$c['ciclo']} días) ya terminó. Confirmar el punto de cosecha en campo.",
+                'accion' => [
+                    'tipo' => 'labor',
+                    'detalle' => 'Cosecha',
+                    'etiqueta' => 'Registrar cosecha'
+                ]
             ];
         } elseif ($rest <= 10) {
             $out[] = [
                 'nivel' => 'info',
                 'titulo' => "Cosecha estimada en {$rest} días",
-                'descripcion' => "Reducir el riego según el cultivo y preparar la mano de obra."
+                'descripcion' => "Reducir el riego según el cultivo y preparar la mano de obra.",
+                'accion' => [
+                    'tipo' => 'labor',
+                    'detalle' => 'Cosecha',
+                    'etiqueta' => 'Registrar cosecha'
+                ]
             ];
         }
 
@@ -192,29 +208,46 @@ class AgronomiaService {
             $out[] = [
                 'nivel' => 'info',
                 'titulo' => 'Posponer el riego',
-                'descripcion' => "Llovieron {$r3} mm en los últimos 3 días. Revisar el drenaje y la humedad antes de volver a regar."
+                'descripcion' => "Llovieron {$r3} mm en los últimos 3 días. Revisar el drenaje y la humedad antes de volver a regar.",
+                'accion' => [
+                    'tipo' => 'lluvia',
+                    'etiqueta' => 'Registrar lluvia'
+                ]
             ];
         } elseif ($desde >= $c['riego'] && $rest > 0) {
             if ($r7 >= 30) {
                 $out[] = [
                     'nivel' => 'info',
                     'titulo' => 'Revisar humedad antes de regar',
-                    'descripcion' => "Han pasado {$desde} días del último riego, pero la lluvia acumulada en 7 días suma {$r7} mm. Comprobar el suelo antes de regar."
+                    'descripcion' => "Han pasado {$desde} días del último riego, pero la lluvia acumulada en 7 días suma {$r7} mm. Comprobar el suelo antes de regar.",
+                    'accion' => [
+                        'tipo' => 'riego',
+                        'valor' => $litros,
+                        'nota' => "Referencia: {$c['ref']} L/mz",
+                        'etiqueta' => 'Registrar riego'
+                    ]
                 ];
             } else {
                 $out[] = [
                     'nivel' => 'alerta',
                     'titulo' => 'Revisar el riego',
-                    'descripcion' => "Han pasado {$desde} días desde el último riego. Para " . strtolower($cultivo) . " la referencia es cada {$c['riego']} días. Confirmar la humedad del suelo."
+                    'descripcion' => "Han pasado {$desde} días desde el último riego. Para " . strtolower($cultivo) . " la referencia es cada {$c['riego']} días. Confirmar la humedad del suelo.",
+                    'accion' => [
+                        'tipo' => 'riego',
+                        'valor' => $litros,
+                        'nota' => "Referencia: {$c['ref']} L/mz",
+                        'etiqueta' => 'Registrar riego'
+                    ]
                 ];
             }
         }
 
         // Ventana de fertilización
-        foreach ($c['fert'] as $fert) {
+        foreach ($c['fert'] as $i => $fert) {
             $d = $fert[0];
             $nombreLab = $fert[1];
             $fMin = self::addDays($siembra, $d - 6);
+            $insumoSugerido = $insumosSugeridos[$i % count($insumosSugeridos)];
 
             $insumoAplicado = !empty(array_filter($own, function($r) use ($fMin) {
                 return ($r['tipo'] ?? $r['TipoCodigo'] ?? '') === 'insumo' && ($r['fecha'] ?? $r['Fecha']) >= $fMin;
@@ -225,14 +258,24 @@ class AgronomiaService {
                     $out[] = [
                         'nivel' => 'alerta',
                         'titulo' => "Toca: " . lcfirst($nombreLab),
-                        'descripcion' => "Van {$dia} días desde la siembra y no hay un insumo registrado en esta ventana. La dosis debe definirse con un técnico o análisis de suelo."
+                        'descripcion' => "Van {$dia} días desde la siembra y no hay un insumo registrado en esta ventana. La dosis debe definirse con un técnico o análisis de suelo.",
+                        'accion' => [
+                            'tipo' => 'insumo',
+                            'detalle' => $insumoSugerido,
+                            'etiqueta' => 'Registrar insumo'
+                        ]
                     ];
                 } else {
                     $diasFaltan = $d - $dia;
                     $out[] = [
                         'nivel' => 'info',
                         'titulo' => "Se acerca: " . lcfirst($nombreLab),
-                        'descripcion' => "Corresponde alrededor del día {$d} del cultivo, en {$diasFaltan} días."
+                        'descripcion' => "Corresponde alrededor del día {$d} del cultivo, en {$diasFaltan} días.",
+                        'accion' => [
+                            'tipo' => 'insumo',
+                            'detalle' => $insumoSugerido,
+                            'etiqueta' => 'Registrar insumo'
+                        ]
                     ];
                 }
             }

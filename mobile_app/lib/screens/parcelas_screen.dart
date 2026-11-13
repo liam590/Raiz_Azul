@@ -7,9 +7,7 @@ import '../widgets/nueva_parcela_modal.dart';
 import '../widgets/detalle_parcela_modal.dart';
 
 class ParcelasScreen extends StatefulWidget {
-  final Function(dynamic parcelaId) onRegistrarTap;
-
-  const ParcelasScreen({super.key, required this.onRegistrarTap});
+  const ParcelasScreen({super.key});
 
   @override
   State<ParcelasScreen> createState() => _ParcelasScreenState();
@@ -27,14 +25,20 @@ class _ParcelasScreenState extends State<ParcelasScreen> {
   }
 
   Future<void> _cargarParcelas() async {
-    setState(() => _cargando = true);
-    final list = await _api.fetchParcelas();
-    if (mounted) {
-      setState(() {
-        _parcelas = list;
-        _cargando = false;
-      });
+    if (mounted) setState(() => _cargando = true);
+
+    List<Parcela> list = _parcelas;
+    try {
+      list = await _api.fetchParcelas();
+    } catch (_) {
+      // Se conserva la lista anterior si la recarga falla.
     }
+
+    if (!mounted) return;
+    setState(() {
+      _parcelas = list;
+      _cargando = false;
+    });
   }
 
   void _abrirNuevaParcela() {
@@ -54,7 +58,6 @@ class _ParcelasScreenState extends State<ParcelasScreen> {
       builder: (_) => DetalleParcelaModal(
         parcela: parcela,
         onDataChanged: _cargarParcelas,
-        onRegistrarTap: widget.onRegistrarTap,
       ),
     );
   }

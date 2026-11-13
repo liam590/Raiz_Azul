@@ -31,38 +31,55 @@ class _NuevaParcelaModalState extends State<NuevaParcelaModal> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() => _guardando = true);
     final area = double.tryParse(_areaCtrl.text.trim()) ?? 1.0;
     final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSiembra);
 
-    final resultado = await _api.crearParcela(
-      nombre: _nombreCtrl.text.trim(),
-      finca: _fincaCtrl.text.trim(),
-      zona: _zona,
-      cultivo: _cultivo,
-      area: area,
-      siembra: fechaStr,
-    );
+    try {
+      final resultado = await _api.crearParcela(
+        nombre: _nombreCtrl.text.trim(),
+        finca: _fincaCtrl.text.trim(),
+        zona: _zona,
+        cultivo: _cultivo,
+        area: area,
+        siembra: fechaStr,
+      );
 
-    if (mounted) {
-      setState(() => _guardando = false);
+      if (!mounted) return;
       if (resultado.success) {
-        Navigator.pop(context);
+        navigator.pop();
         widget.onParcelaCreada();
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             backgroundColor: AppColors.brote,
             content: Text(resultado.message),
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             backgroundColor: AppColors.alerta,
             content: Text(resultado.message),
             duration: const Duration(seconds: 4),
           ),
         );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.alerta,
+            content: Text('No se pudo guardar la parcela: $e'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _guardando = false);
       }
     }
   }

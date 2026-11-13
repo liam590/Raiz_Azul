@@ -1,20 +1,34 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'core/theme.dart';
 import 'core/theme_provider.dart';
 import 'core/connectivity_service.dart';
 import 'core/sync_provider.dart';
-import 'core/offline_api_service.dart';
+import 'core/local_database.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'routes/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // sqflite no tiene implementación nativa en Windows/Linux; en escritorio
+  // usamos la implementación basada en FFI (SQLite embebido).
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux)) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   await initializeDateFormatting('es', null);
-  
-  // Initialize local database
-  OfflineApiService();
+
+  // Abre (o crea) la base local al arrancar para detectar temprano
+  // problemas de SQLite y no bloquear la primera pantalla.
+  final localDbReady = await LocalDatabase().initialize();
+  debugPrint('Raíz Azul: base local ${localDbReady ? 'lista' : 'no disponible'}');
   
   runApp(const RaizAzulApp());
 }

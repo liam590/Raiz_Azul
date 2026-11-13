@@ -67,7 +67,11 @@ class SyncProvider extends ChangeNotifier {
   }
   
   Future<void> _refreshPendingCount() async {
-    _pendingCount = await _localDb.getPendingCount();
+    try {
+      _pendingCount = await _localDb.getPendingCount();
+    } catch (_) {
+      _pendingCount = 0;
+    }
     notifyListeners();
   }
   
