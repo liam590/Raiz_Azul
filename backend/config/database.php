@@ -3,7 +3,7 @@
 
 class Database {
     private $host = "localhost";
-    private $db_name = "RaizAzulDB";
+    private $db_name = "RaizAzul";
     private $username = "sa";
     private $password = "TuPassword123*"; // Configurar con tus credenciales
     private $port = "1433";

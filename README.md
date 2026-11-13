@@ -36,8 +36,11 @@ raiz_azul/
    ```text
    database/schema_raiz_azul.sql
    ```
-4. Se creará la base de datos `RaizAzulDB` con los catálogos de cultivos (Tomate, Chile, Repollo, Maíz, Frijol), zonas de Nicaragua, parcelas de ejemplo y los Procedimientos Almacenados.
-5. Edita tus credenciales en `backend/config/database.php` (host, usuario y contraseña de SQL Server).
+4. Se creará la base de datos `RaizAzul` con los catálogos de cultivos (Tomate, Chile, Repollo, Maíz, Frijol), zonas de Nicaragua, parcelas de ejemplo y los Procedimientos Almacenados. El script es idempotente: puedes ejecutarlo de nuevo para aplicar migraciones sin borrar datos.
+5. Edita tus credenciales en `backend/config/database.php` (host, puerto, usuario y contraseña de SQL Server).
+6. Usuarios de prueba para el login (contraseña `crispin123`): `Crispin`, `Iris`, `Cristin` y `Liam`.
+
+> **Nota:** Si usas el MCP de SQL Server en OpenCode, copia `opencode.example.json` a `opencode.json` y coloca tus credenciales. Ese archivo está en `.gitignore` para no subir contraseñas.
 
 ---
 

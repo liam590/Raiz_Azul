@@ -1,0 +1,25 @@
+# ========================================================
+# OpenCode: configuración local con credenciales reales
+# ========================================================
+opencode.json
+opencode.json.bak
+
+# ========================================================
+# Variables de entorno y secretos
+# ========================================================
+.env
+.env.*
+!.env.example
+
+# ========================================================
+# Datos locales generados por el backend
+# ========================================================
+backend/data_users.json
+
+# ========================================================
+# Logs y archivos del sistema operativo
+# ========================================================
+*.log
+Thumbs.db
+Desktop.ini
+.DS_Store
